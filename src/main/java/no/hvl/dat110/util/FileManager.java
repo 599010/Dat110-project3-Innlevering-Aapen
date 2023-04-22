@@ -58,13 +58,13 @@ public class FileManager {
 	
 	public void createReplicaFiles() {
 	 	
-		// set a loop where size = numReplicas
-		
-		// replicate by adding the index to filename
-		
-		// hash the replica
-		
-		// store the hash in the replicafiles array.
+		    for (int i = 0; i < numReplicas; i++) {
+		        String replicaFilename = filename + i; // add the index to filename
+		        BigInteger replicaHash = Hash.hashOf(replicaFilename); // hash the replica
+		        replicafiles[i] = replicaHash; // store the hash in the replicafiles array
+		    }
+	
+
 	}
 	
     /**
@@ -72,12 +72,12 @@ public class FileManager {
      * @param bytesOfFile
      * @throws RemoteException 
      */
-    public int distributeReplicastoPeers() throws RemoteException {
+public int distributeReplicastoPeers() throws RemoteException {
     	
     	// randomly appoint the primary server to this file replicas
     	Random rnd = new Random(); 							
-    	int index = rnd.nextInt(Util.numReplicas-1);
-    	
+    	int index = rnd.nextInt(numReplicas); // should include last index
+
     	int counter = 0;
 	
     	// Task1: Given a filename, make replicas and distribute them to all active peers such that: pred < replica <= peer
@@ -85,20 +85,38 @@ public class FileManager {
     	// Task2: assign a replica as the primary for this file. Hint, see the slide (project 3) on Canvas
     	
     	// create replicas of the filename
+    	createReplicaFiles();
     	
-		// iterate over the replicas
+    	// iterate over the replicas
+    	for (int i = 0; i < replicafiles.length; i++) {
+    		
+    		BigInteger replica = replicafiles[i];
+    		
+    		// for each replica, find its successor (peer/node) by performing findSuccessor(replica)
+    		NodeInterface successor = chordnode.findSuccessor(replica);
+    		
+    		// call the addKey on the successor and add the replica
+    		successor.addKey(replica);
+    		
+    		// implement a logic to decide if this successor should be assigned as the primary for the file
+    		if (i == index) {
+    			// call the saveFileContent() on the successor and set isPrimary=true if logic above is true otherwise set isPrimary=false
+    			successor.saveFileContent(filename, replica, bytesOfFile, true);
+    			 Message msg = new Message();
+    	    	 msg.setPrimaryServer(true);
+    		} else {
+    			successor.saveFileContent(filename, replica, bytesOfFile, false);
+    			 Message msg = new Message();
+    	    	 msg.setPrimaryServer(false);
+    		}
+    		
+    		// increment counter
+    		counter++;
+    	}
     	
-    	// for each replica, find its successor (peer/node) by performing findSuccessor(replica)
-    	
-    	// call the addKey on the successor and add the replica
-		
-		// implement a logic to decide if this successor should be assigned as the primary for the file
-    	
-    	// call the saveFileContent() on the successor and set isPrimary=true if logic above is true otherwise set isPrimary=false
-    	
-    	// increment counter
 		return counter;
     }
+
 	
 	/**
 	 * 
@@ -106,44 +124,57 @@ public class FileManager {
 	 * @return list of active nodes having the replicas of this file
 	 * @throws RemoteException 
 	 */
-	public Set<Message> requestActiveNodesForFile(String filename) throws RemoteException {
+public Set<Message> requestActiveNodesForFile(String filename) throws RemoteException {
 
-		this.filename = filename;
-		activeNodesforFile = new HashSet<Message>(); 
+    this.filename = filename;
+    activeNodesforFile = new HashSet<Message>(); 
 
-		// Task: Given a filename, find all the peers that hold a copy of this file
-		
-		// generate the N replicas from the filename by calling createReplicaFiles()
-		
-		// iterate over the replicas of the file
-		
-		// for each replica, do findSuccessor(replica) that returns successor s.
-		
-		// get the metadata (Message) of the replica from the successor (i.e., active peer) of the file
-		
-		// save the metadata in the set activeNodesforFile.
-		
-		return activeNodesforFile;
-	}
+    // Task: Given a filename, find all the peers that hold a copy of this file
+
+    // generate the N replicas from the filename by calling createReplicaFiles()
+    createReplicaFiles();
+    
+    // iterate over the replicas of the file
+    for (BigInteger replica : replicafiles) {
+
+        // for each replica, do findSuccessor(replica) that returns successor s.
+        NodeInterface successor = chordnode.findSuccessor(replica);
+
+        // get the metadata (Message) of the replica from the successor (i.e., active peer) of the file
+        Message message = successor.getFilesMetadata(replica);
+
+        // save the metadata in the set activeNodesforFile.
+        activeNodesforFile.add(message);
+    }
+
+    return activeNodesforFile;
+}
+
 	
 	/**
 	 * Find the primary server - Remote-Write Protocol
 	 * @return 
 	 */
-	public NodeInterface findPrimaryOfItem() {
+public NodeInterface findPrimaryOfItem() {
 
-		// Task: Given all the active peers of a file (activeNodesforFile()), find which is holding the primary copy
-		
-		// iterate over the activeNodesforFile
-		
-		// for each active peer (saved as Message)
-		
-		// use the primaryServer boolean variable contained in the Message class to check if it is the primary or not
-		
-		// return the primary when found (i.e., use Util.getProcessStub to get the stub and return it)
-		
-		return null; 
-	}
+    // Task: Given all the active peers of a file (activeNodesforFile()), find which is holding the primary copy
+
+    // iterate over the activeNodesforFile
+    Set<Message> activeNodes = getActiveNodesforFile();
+
+    for (Message message : activeNodes) {
+        // for each active peer (saved as Message)
+
+        // use the primaryServer boolean variable contained in the Message class to check if it is the primary or not
+        if (message.isPrimaryServer()) {
+            // return the primary when found (i.e., use Util.getProcessStub to get the stub and return it)
+            return Util.getProcessStub(message.getNodeName(), message.getPort());
+        }
+    }
+
+    return null; 
+}
+
 	
     /**
      * Read the content of a file and return the bytes

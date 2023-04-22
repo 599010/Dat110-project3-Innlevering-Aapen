@@ -37,17 +37,23 @@ public class Util {
 	 * @return true if (lower <= id <= upper) or false otherwise
 	 */
 	public static boolean checkInterval(BigInteger id, BigInteger lower, BigInteger upper) {
-		// Hint:
-		// using mod = 10, then the interval (6, 2) = (6, 7, 8, 9, 0, 1, 2)
-		// The interval (6, 2) using the notation above means; pred = 6 and node = 2
-		// if id = 4, then (6 < 4 <= 2) = false  
-		// if id = 9, then (6 < 9 <= 2) = true
-		
-		// Task: given an identifier, id: check whether pred < id <= node
-		
-		return false;
+	    int mod = 10; // size of the interval
+	    int pred = (lower.intValue() - 1 + mod) % mod; // predecessor of lower
+	    int node = lower.intValue(); // lower bound of the interval
 
+	    if (id.intValue() > pred && id.intValue() <= node) {
+	        return true;
+	    } else if (lower.compareTo(upper) > 0) {
+	        // wraparound case, upper bound is less than lower bound
+	        int succ = (upper.intValue() + 1) % mod; // successor of upper
+	        if (id.intValue() > pred || id.intValue() <= succ) {
+	            return true;
+	        }
+	    }
+
+	    return false;
 	}
+
 	
 	public static List<String> toString(List<NodeInterface> list) throws RemoteException {
 		List<String> nodestr = new ArrayList<String>();
